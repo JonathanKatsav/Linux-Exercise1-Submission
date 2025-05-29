@@ -1,0 +1,45 @@
+# Variables declaration
+CC       := g++
+CXXFLAGS := -std=c++20 -I usr/include
+SRC_DIR  := usr/src
+ODIR     ?= build
+
+# 1) Gatherring all .cpp under SRC_DIR except the ones to exclude
+SRCS_ALL := $(notdir $(shell find $(SRC_DIR) -maxdepth 1 -name '*.cpp'))
+EXCLUDE  := DataBase.cpp printingDB.cpp
+SRCS     := $(filter-out $(EXCLUDE),$(SRCS_ALL))
+
+# 2) Definining which sources go into the shared library (the excluded ones)
+LIB_SRCS := $(EXCLUDE)
+
+# 3) Object files for executables and library
+OBJS     := $(patsubst %.cpp,$(ODIR)/%.o,$(SRCS))
+LIB_OBJS := $(patsubst %.cpp,$(ODIR)/%.o,$(LIB_SRCS))
+
+# 4) Shared library name and path
+LIBNAME  := shared_lib
+LIBPATH  := $(ODIR)/lib$(LIBNAME).so
+
+# 5) Executable names (.out) from OBJS
+EXES     := $(patsubst $(ODIR)/%.o,$(ODIR)/%.out,$(OBJS))
+
+# Default target builds the shared library and all executables
+.PHONY: all clean
+all: $(LIBPATH) $(EXES)
+
+# Rule: compile any .cpp to .o with -fPIC for shared library compatibility
+$(ODIR)/%.o: $(SRC_DIR)/%.cpp
+	mkdir -p $(ODIR)
+	$(CC) $(CXXFLAGS) -fPIC -c $< -o $@
+
+# Rule: link shared library from LIB_OBJS
+$(LIBPATH): $(LIB_OBJS)
+	$(CC) -shared -fPIC -o $@ $^
+
+# Rule: link each executable against the shared library
+$(ODIR)/%.out: $(ODIR)/%.o $(LIBPATH)
+	$(CC) $(CXXFLAGS) $< -o $@ -L$(ODIR) -l$(LIBNAME)
+
+# Clean up the build directory
+clean:
+	rm -rf $(ODIR)
